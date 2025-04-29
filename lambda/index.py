@@ -68,37 +68,71 @@ def lambda_handler(event, context):
                     "role": "assistant", 
                     "content": [{"text": msg["content"]}]
                 })
+                
+
         
+        import urllib.request
+
+        url = 'https://6048-34-16-203-104.ngrok-free.app/generate'
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+
         # invoke_model用のリクエストペイロード
+        # request_payload = {
+        #     "messages": bedrock_messages,
+        #     "inferenceConfig": {
+        #         "maxTokens": 512,
+        #         "stopSequences": [],
+        #         "temperature": 0.7,
+        #         "topP": 0.9
+        #     }
+        # }
+        # 自分自身のFastAPIからの取得
+        
         request_payload = {
-            "messages": bedrock_messages,
-            "inferenceConfig": {
-                "maxTokens": 512,
-                "stopSequences": [],
-                "temperature": 0.7,
-                "topP": 0.9
-            }
+            "prompt": message,
+            "max_new_tokens": 512,
+            "do_sample": "true",
+            "temperature": 0.7,
+            "top_p": 0.9
         }
         
         print("Calling Bedrock invoke_model API with payload:", json.dumps(request_payload))
-        
+
         # invoke_model APIを呼び出し
-        response = bedrock_client.invoke_model(
-            modelId=MODEL_ID,
-            body=json.dumps(request_payload),
-            contentType="application/json"
-        )
+        # response = bedrock_client.invoke_model(
+        #     modelId=MODEL_ID,
+        #     body=json.dumps(request_payload),
+        #     contentType="application/json"
+        # )
+        # 自分自身のFastAPIからの取得
+        try:
+            req = urllib.request.Request(url, json.dumps(request_payload).encode(), headers)
+            with urllib.request.urlopen(req, timeout=120) as res:
+                response = res.read()
+        except urllib.error.URLError as e:
+            print("URLError:", str(e))
+            raise
+        
+
         
         # レスポンスを解析
-        response_body = json.loads(response['body'].read())
+        # response_body = json.loads(response['body'].read())
+        response_body = json.loads(response)
         print("Bedrock response:", json.dumps(response_body, default=str))
         
         # 応答の検証
-        if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
+        # if not response_body.get('output') or not response_body['output'].get('message') or not response_body['output']['message'].get('content'):
+        #     raise Exception("No response content from the model")
+        
+        if not response_body.get('generated_text'):
             raise Exception("No response content from the model")
         
         # アシスタントの応答を取得
-        assistant_response = response_body['output']['message']['content'][0]['text']
+        # assistant_response = response_body['output']['message']['content'][0]['text']
+        assistant_response = response_body['generated_text']
         
         # アシスタントの応答を会話履歴に追加
         messages.append({
